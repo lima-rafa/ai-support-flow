@@ -1,0 +1,258 @@
+{
+  "name": "ASF WF-001 — Ticket triage / n8n",
+  "nodes": [
+    {
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        200
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "asf-ticket-created",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "webhookId": "asf-ticket-created"
+    },
+    {
+      "id": "analyze",
+      "name": "Analyze",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        450,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ \"http://backend:8000/internal/tickets/\" + $(\"Webhook\").first().json.body.ticket_id + \"/analyze\" }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ event_id: $(\"Webhook\").first().json.body.event_id }) }}",
+        "options": {}
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "google-sheets-upsert",
+      "name": "Google Sheets Upsert",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        690,
+        140
+      ],
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SPREADSHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Chamados",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ticket_id": "={{ $(\"Analyze\").first().json.ticket_id }}",
+            "category": "={{ $(\"Analyze\").first().json.category }}",
+            "priority": "={{ $(\"Analyze\").first().json.effective_priority }}",
+            "summary": "={{ $(\"Analyze\").first().json.summary }}",
+            "ticket_status": "={{ $(\"Analyze\").first().json.requires_human_review ? \"awaiting_review\" : \"triaged\" }}",
+            "timestamp": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [
+            "ticket_id"
+          ],
+          "schema": [
+            {
+              "id": "ticket_id",
+              "displayName": "ticket_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "priority",
+              "displayName": "priority",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "ticket_status",
+              "displayName": "ticket_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "sync-succeeded",
+      "name": "Sync Succeeded",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        940,
+        140
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ \"http://backend:8000/internal/tickets/\" + $(\"Webhook\").first().json.body.ticket_id + \"/sync-status\" }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ event_id: $(\"Webhook\").first().json.body.event_id, status: \"succeeded\", failure_stage: \"none\" }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "analysis-failed",
+      "name": "Analysis Failed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        690,
+        360
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ \"http://backend:8000/internal/tickets/\" + $(\"Webhook\").first().json.body.ticket_id + \"/sync-status\" }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ event_id: $(\"Webhook\").first().json.body.event_id, status: \"failed\", failure_stage: \"analysis\", error_code: \"ANALYSIS_FAILED\" }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "sheets-failed",
+      "name": "Sheets Failed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        940,
+        280
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ \"http://backend:8000/internal/tickets/\" + $(\"Webhook\").first().json.body.ticket_id + \"/sync-status\" }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ event_id: $(\"Webhook\").first().json.body.event_id, status: \"failed\", failure_stage: \"sync\", error_code: \"SHEETS_SYNC_FAILED\" }) }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Analyze",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets Upsert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Analysis Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets Upsert": {
+      "main": [
+        [
+          {
+            "node": "Sync Succeeded",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sheets Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

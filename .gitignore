@@ -1,0 +1,54 @@
+# Segredos e configurações privadas
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
+*service-account*.json
+
+# Dados locais e backups
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.bak
+*.backup
+*.dump
+*.sql.gz
+/data/
+.n8n/
+asf-backup*
+
+# Python e testes
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+.venv-*/
+venv/
+
+# JS e build
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Etapas temporárias e IDE
+_etapa*/
+**/_etapa*/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Relatórios locais, logs e capturas não revisadas
+*.log
+*.tmp
+screenshots-private/

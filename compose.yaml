@@ -1,0 +1,48 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      DATABASE_PATH: /data/asf.sqlite
+      AI_MODE: ${AI_MODE:-mock}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ASF_INTERNAL_SERVICE_KEY: ${ASF_INTERNAL_SERVICE_KEY:?Set ASF_INTERNAL_SERVICE_KEY in .env}
+    volumes:
+      - asf_data:/data
+    restart: unless-stopped
+
+  dispatcher:
+    build: ./backend
+    command: ["python", "-m", "app.workers.dispatcher"]
+    environment:
+      DATABASE_PATH: /data/asf.sqlite
+      N8N_WEBHOOK_URL: http://n8n:5678/webhook/asf-ticket-created
+      N8N_WEBHOOK_KEY: ${N8N_WEBHOOK_KEY:?Set N8N_WEBHOOK_KEY in .env}
+    volumes:
+      - asf_data:/data
+    depends_on:
+      - backend
+      - n8n
+    restart: unless-stopped
+
+  n8n:
+    image: ${N8N_IMAGE:-n8nio/n8n:2.0.0}
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      N8N_HOST: localhost
+      N8N_PORT: "5678"
+      N8N_PROTOCOL: http
+      N8N_SECURE_COOKIE: "false" # SOMENTE demo local sem HTTPS
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Set N8N_ENCRYPTION_KEY in .env}
+      GENERIC_TIMEZONE: America/Recife
+      TZ: America/Recife
+    volumes:
+      - n8n_data:/home/node/.n8n
+    restart: unless-stopped
+
+volumes:
+  asf_data:
+  n8n_data:
